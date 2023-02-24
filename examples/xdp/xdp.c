@@ -7,6 +7,15 @@ char __license[] SEC("license") = "Dual MIT/GPL";
 
 #define MAX_MAP_ENTRIES 16
 
+enum {
+	BPF_F_NO_PREALLOC = (1U << 0),
+};
+
+struct ip4_trie_key {
+	__u32 prefixlen;
+	__u32 addr;
+};
+
 /* Define an LRU hash map for storing packet count by source IPv4 address */
 struct {
 	__uint(type, BPF_MAP_TYPE_LRU_HASH);
@@ -14,6 +23,15 @@ struct {
 	__type(key, __u32);   // source IPv4 address
 	__type(value, __u32); // packet count
 } xdp_stats_map SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_LPM_TRIE);
+	__uint(max_entries, MAX_MAP_ENTRIES);
+	__type(key, struct ip4_trie_key);
+	__type(value, __u32);
+	__uint(pinning, LIBBPF_PIN_BY_NAME);
+	__uint(map_flags, BPF_F_NO_PREALLOC);
+} xdp_denylist_map SEC(".maps");
 
 /*
 Attempt to parse the IPv4 source address from the packet.

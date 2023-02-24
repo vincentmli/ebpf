@@ -13,6 +13,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -23,9 +24,20 @@ import (
 // $BPF_CLANG and $BPF_CFLAGS are set by the Makefile.
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc $BPF_CLANG -cflags $BPF_CFLAGS bpf xdp.c -- -I../headers
 
+const (
+	bpfFSPath = "/sys/fs/bpf"
+)
+
 func main() {
 	if len(os.Args) < 2 {
 		log.Fatalf("Please specify a network interface")
+	}
+
+	mapName := "denylist"
+
+	pinPath := path.Join(bpfFSPath, mapName)
+	if err := os.MkdirAll(pinPath, os.ModePerm); err != nil {
+		log.Fatalf("failed to create bpf fs subpath: %+v", err)
 	}
 
 	// Look up the network interface by name.
@@ -37,7 +49,15 @@ func main() {
 
 	// Load pre-compiled programs into the kernel.
 	objs := bpfObjects{}
-	if err := loadBpfObjects(&objs, nil); err != nil {
+	if err := loadBpfObjects(&objs, &ebpf.CollectionOptions{
+		Maps: ebpf.MapOptions{
+			// Pin the map to the BPF filesystem and configure the
+			// library to automatically re-write it in the BPF
+			// program so it can be re-used if it already exists or
+			// create it if not
+			PinPath: pinPath,
+		},
+	}); err != nil {
 		log.Fatalf("loading objects: %s", err)
 	}
 	defer objs.Close()
