@@ -9,6 +9,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"log"
 	"net"
@@ -34,6 +35,7 @@ func main() {
 	}
 
 	mapName := "denylist"
+	progName := "denyProg"
 
 	pinPath := path.Join(bpfFSPath, mapName)
 	if err := os.MkdirAll(pinPath, os.ModePerm); err != nil {
@@ -60,6 +62,39 @@ func main() {
 	}); err != nil {
 		log.Fatalf("loading objects: %s", err)
 	}
+
+	//from: https://xiongliuhua.com/ebpf/201/
+	dropIP := []string{"192.168.1.0/24", "127.0.0.0/16"}
+	for index, ip := range dropIP {
+		//for _, ip := range dropIP {
+
+		if !strings.Contains(ip, "/") {
+
+			ip += "/32"
+
+		}
+		_, ipnet, err := net.ParseCIDR(ip)
+
+		if err != nil {
+
+			log.Printf("malformed ip %v \n", err)
+
+			continue
+		}
+		var res = make([]byte, objs.XdpDenylistMap.KeySize())
+
+		ones, _ := ipnet.Mask.Size()
+
+		binary.LittleEndian.PutUint32(res, uint32(ones))
+
+		copy(res[4:], ipnet.IP)
+		if err := objs.XdpDenylistMap.Put(res, uint32(index)); err != nil {
+			//	if err := objs.XdpDenylistMap.Delete(res); err != nil {
+
+			log.Fatalf("blacklist put err %v \n", err)
+
+		}
+	}
 	defer objs.Close()
 
 	// Attach the program.
@@ -69,6 +104,10 @@ func main() {
 	})
 	if err != nil {
 		log.Fatalf("could not attach XDP program: %s", err)
+	}
+	err = l.Pin(progName)
+	if err != nil {
+		log.Fatalf("could not pin XDP program: %s", err)
 	}
 	defer l.Close()
 
