@@ -35,7 +35,6 @@ func main() {
 	}
 
 	mapName := "denylist"
-	progName := "denyProg"
 
 	pinPath := path.Join(bpfFSPath, mapName)
 	if err := os.MkdirAll(pinPath, os.ModePerm); err != nil {
@@ -105,6 +104,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("could not attach XDP program: %s", err)
 	}
+	progName := "/sys/fs/bpf/denyprog"
 	err = l.Pin(progName)
 	if err != nil {
 		log.Fatalf("could not pin XDP program: %s", err)
