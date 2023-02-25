@@ -97,6 +97,62 @@ struct iphdr {
 	__be32 daddr;
 };
 
+//from <linux/in.h>
+/* Standard well-defined IP protocols.  */
+enum {
+  IPPROTO_IP = 0,               /* Dummy protocol for TCP               */
+#define IPPROTO_IP              IPPROTO_IP
+  IPPROTO_ICMP = 1,             /* Internet Control Message Protocol    */
+#define IPPROTO_ICMP            IPPROTO_ICMP
+  IPPROTO_IGMP = 2,             /* Internet Group Management Protocol   */
+#define IPPROTO_IGMP            IPPROTO_IGMP
+  IPPROTO_IPIP = 4,             /* IPIP tunnels (older KA9Q tunnels use 94) */
+#define IPPROTO_IPIP            IPPROTO_IPIP
+  IPPROTO_TCP = 6,              /* Transmission Control Protocol        */
+#define IPPROTO_TCP             IPPROTO_TCP
+  IPPROTO_EGP = 8,              /* Exterior Gateway Protocol            */
+#define IPPROTO_EGP             IPPROTO_EGP
+  IPPROTO_PUP = 12,             /* PUP protocol                         */
+#define IPPROTO_PUP             IPPROTO_PUP
+  IPPROTO_UDP = 17,             /* User Datagram Protocol               */
+#define IPPROTO_UDP             IPPROTO_UDP
+};
+
+//from <linux/tcp.h>, removed <asm/byteorder.h>
+struct tcphdr {
+        __be16  source;
+        __be16  dest;
+        __be32  seq;
+        __be32  ack_seq;
+#if defined(__LITTLE_ENDIAN_BITFIELD)
+        __u16   res1:4,
+                doff:4,
+                fin:1,
+                syn:1,
+                rst:1,
+                psh:1,
+                ack:1,
+                urg:1,
+                ece:1,
+                cwr:1;
+#elif defined(__BIG_ENDIAN_BITFIELD)
+        __u16   doff:4,
+                res1:4,
+                cwr:1,
+                ece:1,
+                urg:1,
+                ack:1,
+                psh:1,
+                rst:1,
+                syn:1,
+                fin:1;
+#endif
+        __be16  window;
+        __sum16 check;
+        __be16  urg_ptr;
+};
+
+
 enum {
 	BPF_ANY     = 0,
 	BPF_NOEXIST = 1,
