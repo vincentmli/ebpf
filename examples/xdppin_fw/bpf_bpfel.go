@@ -12,6 +12,11 @@ import (
 	"github.com/cilium/ebpf"
 )
 
+type bpfIp4TrieKey struct {
+	Prefixlen uint32
+	Addr      uint32
+}
+
 // loadBpf returns the embedded CollectionSpec for bpf.
 func loadBpf() (*ebpf.CollectionSpec, error) {
 	reader := bytes.NewReader(_BpfBytes)
@@ -60,6 +65,7 @@ type bpfProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type bpfMapSpecs struct {
+	DvbsMap     *ebpf.MapSpec `ebpf:"dvbs_map"`
 	XdpStatsMap *ebpf.MapSpec `ebpf:"xdp_stats_map"`
 }
 
@@ -82,11 +88,13 @@ func (o *bpfObjects) Close() error {
 //
 // It can be passed to loadBpfObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bpfMaps struct {
+	DvbsMap     *ebpf.Map `ebpf:"dvbs_map"`
 	XdpStatsMap *ebpf.Map `ebpf:"xdp_stats_map"`
 }
 
 func (m *bpfMaps) Close() error {
 	return _BpfClose(
+		m.DvbsMap,
 		m.XdpStatsMap,
 	)
 }
