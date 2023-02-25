@@ -9,6 +9,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"log"
 	"net"
@@ -60,6 +61,40 @@ func main() {
 	}); err != nil {
 		log.Fatalf("loading objects: %s", err)
 	}
+
+	//from: https://xiongliuhua.com/ebpf/201/, populate the dvbs map
+	dvbsIP := []string{"10.169.72.0/24", "127.0.0.0/8"}
+	for index, ip := range dvbsIP {
+		//for _, ip := range dropIP {
+
+		if !strings.Contains(ip, "/") {
+
+			ip += "/32"
+
+		}
+		_, ipnet, err := net.ParseCIDR(ip)
+
+		if err != nil {
+
+			log.Printf("malformed ip %v \n", err)
+
+			continue
+		}
+		var res = make([]byte, objs.DvbsMap.KeySize())
+
+		ones, _ := ipnet.Mask.Size()
+
+		binary.LittleEndian.PutUint32(res, uint32(ones))
+
+		copy(res[4:], ipnet.IP)
+		if err := objs.DvbsMap.Put(res, uint32(index)); err != nil {
+			//	if err := objs.XdpDenylistMap.Delete(res); err != nil {
+
+			log.Fatalf("dvbs put err %v \n", err)
+
+		}
+	}
+	defer objs.Close()
 
 	// Attach the program.
 	l, err := link.AttachXDP(link.XDPOptions{
