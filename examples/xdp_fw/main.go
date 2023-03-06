@@ -1,16 +1,10 @@
-// This program demonstrates attaching an eBPF program to a network interface
-// with XDP (eXpress Data Path). The program parses the IPv4 source address
-// from packets and writes the packet count by IP to an LRU hash map.
-// The userspace program (Go code in this file) prints the contents
-// of the map to stdout every second.
-// It is possible to modify the XDP program to drop or redirect packets
-// as well -- give it a try!
+// This program demonstrates attaching an eBPF program to a network interface to
+// block source IPs/CIDRs
 // This example depends on bpf_link, available in Linux kernel version 5.7 or newer.
 package main
 
 import (
 	"encoding/binary"
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -62,10 +56,9 @@ func main() {
 		log.Fatalf("loading objects: %s", err)
 	}
 
-	//from: https://xiongliuhua.com/ebpf/201/, populate the dvbs map
-	dvbsIP := []string{"10.169.72.0/24", "127.0.0.0/8"}
-	for index, ip := range dvbsIP {
-		//for _, ip := range dropIP {
+	//from: https://xiongliuhua.com/ebpf/201/, populate the firewall map
+	denyIPs := []string{"1.2.3.4/32", "127.0.0.1/32"}
+	for index, ip := range denyIPs {
 
 		if !strings.Contains(ip, "/") {
 
@@ -75,30 +68,25 @@ func main() {
 		_, ipnet, err := net.ParseCIDR(ip)
 
 		if err != nil {
-
 			log.Printf("malformed ip %v \n", err)
-
 			continue
 		}
-		var res = make([]byte, objs.DvbsMap.KeySize())
+		var res = make([]byte, objs.FirewallMap.KeySize())
 
 		ones, _ := ipnet.Mask.Size()
 
 		binary.LittleEndian.PutUint32(res, uint32(ones))
 
 		copy(res[4:], ipnet.IP)
-		if err := objs.DvbsMap.Put(res, uint32(index)); err != nil {
-			//	if err := objs.XdpDenylistMap.Delete(res); err != nil {
-
-			log.Fatalf("dvbs put err %v \n", err)
-
+		if err := objs.FirewallMap.Put(res, uint32(index)); err != nil {
+			log.Fatalf("FirewallMap put err %v \n", err)
 		}
 	}
 	defer objs.Close()
 
 	// Attach the program.
 	l, err := link.AttachXDP(link.XDPOptions{
-		Program:   objs.XdpProgFunc,
+		Program:   objs.Firewall,
 		Interface: iface.Index,
 	})
 	if err != nil {
@@ -113,26 +101,6 @@ func main() {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 	for range ticker.C {
-		s, err := formatMapContents(objs.XdpStatsMap)
-		if err != nil {
-			log.Printf("Error reading map: %s", err)
-			continue
-		}
-		log.Printf("Map contents:\n%s", s)
+		log.Printf("Map contents:\n")
 	}
-}
-
-func formatMapContents(m *ebpf.Map) (string, error) {
-	var (
-		sb  strings.Builder
-		key []byte
-		val uint32
-	)
-	iter := m.Iterate()
-	for iter.Next(&key, &val) {
-		sourceIP := net.IP(key) // IPv4 source address in network byte order.
-		packetCount := val
-		sb.WriteString(fmt.Sprintf("\t%s => %d\n", sourceIP, packetCount))
-	}
-	return sb.String(), iter.Err()
 }
